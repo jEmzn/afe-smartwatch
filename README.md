@@ -1,4 +1,4 @@
-# smartwatchsepawv2
+# SEPAWV2
 
 
 
@@ -15,14 +15,14 @@ Already a pro? Just edit this README.md and make it your own. Want to make it ea
 
 ```
 cd existing_repo
-git remote add origin https://gitlab.com/wichepjaiboon17/smartwatchsepawv2.git
+git remote add origin https://gitlab.com/wichepjaiboon17/sepawv2.git
 git branch -M main
 git push -uf origin main
 ```
 
 ## Integrate with your tools
 
-- [ ] [Set up project integrations](https://gitlab.com/wichepjaiboon17/smartwatchsepawv2/-/settings/integrations)
+- [ ] [Set up project integrations](https://gitlab.com/wichepjaiboon17/sepawv2/-/settings/integrations)
 
 ## Collaborate with your team
 
