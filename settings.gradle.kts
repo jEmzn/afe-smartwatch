@@ -5,13 +5,17 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
+        flatDir {
+            dirs("app/libs") // ✅ เพิ่มให้สามารถโหลด .aar จาก app/libs
+        }
     }
 }
 
-rootProject.name = "WatchSEPAWV2"
+rootProject.name = "DemoAssist"
 include(":app")

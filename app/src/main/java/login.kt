@@ -24,6 +24,10 @@ class login : ComponentActivity() {
         val permission = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         ActivityCompat.requestPermissions(this,permission,0)
         //When on click btnConnect
+        val preferenceData = MyPreferenceData(this)
+        if(preferenceData.getLoginStatus() == true ) {
+            goTostandbymain()
+        }
         val btnConnect = findViewById<Button>(R.id.btnConnect)
         btnConnect.setOnClickListener{
             val uId = findViewById<EditText>(R.id.inputID).text.toString()
@@ -34,7 +38,7 @@ class login : ComponentActivity() {
     }
 
     private fun connectPhoneApp(uId: String, uPin:String){
-        val url = "https://sepaw.wtnitgroup.com/api/watchconnphone?uId=$uId&uPin=$uPin"
+        val url = "https://afetest.newjtech.online/api/watchconnphone?uId=$uId&uPin=$uPin"
         val jsonObjectRequest = JsonObjectRequest(
             Request.Method.GET, url, null,
             { response ->
