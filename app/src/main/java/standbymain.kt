@@ -59,6 +59,7 @@ import java.time.Clock.systemDefaultZone
 import java.time.Duration
 import kotlin.math.roundToInt
 import android.view.GestureDetector
+import android.view.Gravity
 import android.view.MotionEvent
 import androidx.core.content.ContextCompat
 
@@ -431,10 +432,13 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
         val textDistance = findViewById<TextView>(R.id.distance)
 
         if (!standbymain.isTrackingOn) {
-            textLatLng.text = " "
-            textStatus.text = " "
-            textDistance.text = "ระบบติดตามถูกปิดใช้งาน"
+            textLatLng.text = ""
+            textStatus.text = "⛔\nระบบติดตาม\nถูกปิดใช้งาน"
+            textDistance.text = ""
 
+            textStatus.textSize = 18f // เพิ่มขนาดหน่อย (หน่วยใน Code เป็น scaled pixels)
+            textStatus.gravity = Gravity.CENTER // จัดกึ่งกลาง
+            textStatus.setTextColor(0xFFCCCCCC.toInt()) // เปลี่ยนเป็นสีเทาอ่อน ให้ดูรู้ว่า Inactive
             return
         }
 
