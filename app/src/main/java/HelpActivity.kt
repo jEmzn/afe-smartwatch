@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import com.example.watchsepawv2.R
+import com.example.watchsepawv2.presentation.BackgroundService.Companion.isEmergencyMode
 import com.example.watchsepawv2.presentation.standbymain.Companion.curLat
 import com.example.watchsepawv2.presentation.standbymain.Companion.curLong
 import okhttp3.Call
@@ -21,6 +22,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.json.JSONException
+import org.json.JSONObject
 import java.io.IOException
 
 class HelpActivity : Activity() {
@@ -66,6 +69,17 @@ class HelpActivity : Activity() {
 
         setContentView(R.layout.activity_help)
 
+        // ✅ 1. สั่งเปิดโหมดฉุกเฉิน และบังคับเปิด GPS ทันที!
+//        BackgroundService.isEmergencyMode = true
+
+        if (!(BackgroundService.isServerAllowTrackingGps)) {
+            val intent = Intent(this, BackgroundService::class.java).apply {
+                action =
+                    BackgroundService.ACTION_START_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
+            }
+            startService(intent)
+        }
+
         textView = findViewById(R.id.txtHelp)
         buttonOk = findViewById(R.id.btnOk)
         buttonNotOk = findViewById(R.id.btnNotOk)
@@ -77,6 +91,16 @@ class HelpActivity : Activity() {
         buttonOk.setOnClickListener {
             val fallstatus = 1
             preferenceData.setFallStatus(fallstatus) // 1 = โอเค
+//            BackgroundService.isEmergencyMode = false
+            if (!(BackgroundService.isServerAllowTrackingGps)) {
+                val intent = Intent(this, BackgroundService::class.java).apply {
+                    action =
+                        BackgroundService.ACTION_STOP_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
+
+                }
+                startService(intent)
+            }
+
             sendFallToServer(preferenceData, fallstatus)  // ส่งข้อมูลการล้ม (สถานะโอเค) ไป backend
             Toast.makeText(this, "ยืนยันว่าปลอดภัย", Toast.LENGTH_SHORT).show()
             navigateToMainActivity() //กลับไปยังหน้าหลัก
@@ -84,6 +108,13 @@ class HelpActivity : Activity() {
 
         buttonNotOk.setOnClickListener {
             val fallstatus = 2
+//            if (!(BackgroundService.isServerAllowTrackingGps)) {
+//                val intent = Intent(this, BackgroundService::class.java).apply {
+//                    action =
+//                        BackgroundService.ACTION_START_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
+//                }
+//                startService(intent)
+//            }
             preferenceData.setFallStatus(fallstatus) // 2 = ไม่โอเค
 
             Thread {
@@ -105,6 +136,13 @@ class HelpActivity : Activity() {
             override fun onFinish() {
                 textView.text = "ไม่มีการตอบสนอง กำลังแจ้งเตือนผู้ดูแล..."
                 val fallStatus = 3
+//                if (!(BackgroundService.isServerAllowTrackingGps)) {
+//                    val intent = Intent(this@HelpActivity, BackgroundService::class.java).apply {
+//                        action =
+//                            BackgroundService.ACTION_START_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
+//                    }
+//                    this@HelpActivity.startService(intent)
+//                }
                 preferenceData.setFallStatus(fallStatus) // 3 = ไม่ตอบ
                 // ส่งทั้ง SOS และข้อมูลการล้มไป backend พร้อมกัน
                 Thread {
@@ -127,11 +165,44 @@ class HelpActivity : Activity() {
         finish()
     }
 
+    private fun sendFallWithFreshLocation(fallStatus: Int) {
+        val pref = preferenceData
+
+        // ถ้า tracking ยังเปิดอยู่ ใช้ค่า curLat/curLong ตามเดิม (ไม่เปลี่ยน flow เดิม)
+        if (standbymain.isTrackingOn) {
+            sendFallToServer(pref, fallStatus)
+            return
+        }
+
+        // ถ้า tracking ถูกปิด → ขอ location แบบ one-shot
+        GpsTracker(this).getLocation { loc ->
+            val lat = loc?.latitude ?: standbymain.curLat
+            val lon = loc?.longitude ?: standbymain.curLong
+
+            // กันกรณี lat/lon ยังเป็น 0.0 → จะไม่ส่ง 0,0 ออกไป
+            val finalLat = if (lat == 0.0) null else lat
+            val finalLon = if (lon == 0.0) null else lon
+
+            if (finalLat != null && finalLon != null) {
+                sendFallToServer(pref, fallStatus)
+            } else {
+                // ตรงนี้แล้วแต่คุณจะเลือก: แจ้งเตือนว่าหาตำแหน่งไม่ได้ หรือส่งแบบไม่ระบุพิกัด
+                Log.d("FALL_API", "ไม่สามารถหาตำแหน่งตอนล้มได้")
+            }
+        }
+    }
+
+
     private fun sendFallToServer(preferenceData: MyPreferenceData, fallStatus: Int) {
         Log.d("FALL_API", "ส่งข้อมูลการล้มไป backend (status: $fallStatus)")
-        val client = OkHttpClient()
-        val url = "https://afetest.newjtech.online/api/sentFall"
-        val jsonBody = """
+
+        // 👇 ขอพิกัด 1 ครั้งก่อนส่งไป server
+
+            val lat = standbymain.curLat
+            val long = standbymain.curLong
+            val client = OkHttpClient()
+            val url = "https://afe-project-production.up.railway.app/api/sentFall"
+            val jsonBody = """
             {
                 "users_id": "${preferenceData.getUserId()}",
                 "takecare_id": "${preferenceData.getTakecareId()}",
@@ -139,32 +210,62 @@ class HelpActivity : Activity() {
                 "y_axis": "${preferenceData.getYAxis()}",
                 "z_axis": "${preferenceData.getZAxis()}",
                 "fall_status": "$fallStatus",
-                "latitude": "$curLat",
-                "longitude": "$curLong"
+                "latitude": "$lat",
+                "longitude": "$long"
             }
         """.trimIndent().toRequestBody()
+            val request = Request.Builder()
+                .url(url)
+                .put(jsonBody)
+                .addHeader("Content-Type", "application/json")
+                .build()
+            Thread {
+                try {
+                    client.newCall(request).enqueue(object : Callback {
+                        override fun onFailure(call: Call, e: IOException) {
+                            Log.d("FALL_API", "❌ Error: ${e.message}")
+                        }
+                        override fun onResponse(call: Call, response: Response) {
+                            Log.d("FALL_API", "✅ Sent: ${response.code} Successfully")
 
-        val request = Request.Builder()
-            .url(url)
-            .put(jsonBody)
-            .addHeader("Content-Type", "application/json")
-            .build()
+                            val responseBodyStr = response.body?.string()
+                            if (response.isSuccessful && responseBodyStr != null) {
+                                Log.d("FALL_API", "✅ ส่งสำเร็จ! Response: $responseBodyStr")
 
-        Thread {
-            try {
-                client.newCall(request).enqueue(object : Callback {
-                    override fun onFailure(call: Call, e: IOException) {
-                        Log.d("FALL_API", "❌ Error: ${e.message}")
-                    }
-                    override fun onResponse(call: Call, response: Response) {
-                        Log.d("FALL_API", "✅ Sent: ${response.code} Successfully")
-                    }
-                })
-            } catch (e: IOException) {
-                Log.d("FALL_API", "❌ IOException: ${e.message}")
-            }
-        }.start()
-    }
+                                try {
+                                    // 2. แปลง String เป็น JSON Object เพื่อดึงค่า
+                                    val json = JSONObject(responseBodyStr)
+
+                                    if (json.has("stop_emergency")) {
+                                        val stopEmergency = json.getBoolean("stop_emergency")
+                                        if (stopEmergency && !(BackgroundService.isServerAllowTrackingGps)) {
+                                            val intent = Intent(this@HelpActivity, BackgroundService::class.java).apply {
+                                                action =
+                                                    BackgroundService.ACTION_STOP_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
+
+                                            }
+                                            startService(intent)
+                                        }
+                                    }
+
+                                } catch (e: JSONException) {
+                                    Log.e("FALL_API", "❌ อ่าน JSON ผิดพลาด: ${e.message}")
+                                }
+                            } else {
+                                Log.e("FALL_API", "⚠️ Server ตอบกลับ Error: ${response.code}")
+                            }
+
+                            // อย่าลืมปิด response เสมอ
+                            response.close()
+
+                        }
+                    })
+                } catch (e: IOException) {
+                    Log.d("FALL_API", "❌ IOException: ${e.message}")
+                }
+            }.start()
+        }
+
 
 //    private fun requestSOS(uId: String): Int { ... }
 

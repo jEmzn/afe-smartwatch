@@ -230,6 +230,8 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
         Log.d("Debug", "SafeZoneLat=$safeZoneLat, SafeZoneLong=$safeZoneLong, R1=$r1, R2=$r2")
         val btnSos = findViewById<Button>(R.id.btnSos)
         btnSos.setOnClickListener {
+//            val intent = Intent(this, HelpActivity::class.java)
+//            startActivity(intent)
             Thread {
                 val statusCodeSOS = requestSOS(uId)
                 runOnUiThread {
@@ -442,8 +444,16 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
             return
         }
 
+        textStatus.textSize = 12f // เพิ่มขนาดหน่อย (หน่วยใน Code เป็น scaled pixels)
+        textStatus.setTextColor(0xFFFFFFFF.toInt()) // เปลี่ยนเป็นสีเทาอ่อน ให้ดูรู้ว่า Inactive
+
+
         // แสดงค่าพิกัดปัจจุบัน
         textLatLng.text = "ละติจูด %.3f \nลองจิจูด %.3f".format(curLat, curLong)
+        Log.d("GPS", "Latitude: $curLat, Longitude: $curLong")
+        Log.d("GPS, Distance", "Distance: $distance")
+        Log.d("GPS", "R1: $r1, R2: $r2")
+
 
         if (curLat != 0.0 && curLong != 0.0) {
             if (distance <= r1) {
@@ -515,7 +525,7 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
     public fun requestOkHttpClient(preferenceData: MyPreferenceData) {
         try {
             val client = OkHttpClient()
-            val url = "https://afetest.newjtech.online/api/sentlocation"
+            val url = "https://afe-project-production.up.railway.app/api/sentlocation"
             //val mediaType = "application/json".toMediaType()
             val body = """
     {
@@ -605,7 +615,7 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
     //Private
     fun requestSOS(uId: String): Int {
         val client = OkHttpClient()
-        val url = "https://afetest.newjtech.online/api/requestSOS"
+        val url = "https://afe-project-production.up.railway.app/api/requestSOS"
 //        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
 //            .addFormDataPart("uid",uId.toString())
 //            .build()

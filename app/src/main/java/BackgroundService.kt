@@ -115,6 +115,15 @@ class BackgroundService : Service(), ConnectionObserver {
     private val LOG_RAW_EVERY_MS = 250L
     private var lastRawLog = 0L
 
+    private var isTrackingLocation = false
+
+    companion object {
+        const val ACTION_START_TRACKING = "ACTION_START_TRACKING" // ชื่อคำสั่งเปิด
+        const val ACTION_STOP_TRACKING = "ACTION_STOP_TRACKING"   // ชื่อคำสั่งปิด
+        var isEmergencyMode = false
+        var isServerAllowTrackingGps = false // อนุญาติให้มีการตรวจสอบว่าผู้ใช้จะเแิดหรอืปิดระบบติดตามแบบ realtime
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -197,6 +206,11 @@ class BackgroundService : Service(), ConnectionObserver {
             Log.w("GPS", "no location permission")
             return
         }
+
+//        if (isTrackingLocation) {
+//            Log.d("GPS", "Tracking is already running. Skipping start.")
+//            return
+//        }
 
         val req = LocationRequest.create()
             .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
@@ -488,9 +502,15 @@ class BackgroundService : Service(), ConnectionObserver {
 
     // ------------------- API parts -------------------
     private fun sendFallToServer(preferenceData: MyPreferenceData, fallStatus: Int) {
-        val client = OkHttpClient()
-        val url = "https://afetest.newjtech.online/api/sentFall"
-        val jsonBody = """
+        Log.d("FALL_API", "ส่งข้อมูลการล้มไป backend (status: $fallStatus)")
+
+        // 👇 ขอพิกัด 1 ครั้งก่อนส่งไป server
+
+            val lat = standbymain.curLat
+            val long = standbymain.curLong
+            val client = OkHttpClient()
+            val url = "https://afe-project-production.up.railway.app/api/sentFall"
+            val jsonBody = """
             {
                 "users_id": "${preferenceData.getUserId()}",
                 "takecare_id": "${preferenceData.getTakecareId()}",
@@ -498,36 +518,35 @@ class BackgroundService : Service(), ConnectionObserver {
                 "y_axis": "${preferenceData.getYAxis()}",
                 "z_axis": "${preferenceData.getZAxis()}",
                 "fall_status": "$fallStatus",
-                "latitude": "${standbymain.curLat}",
-                "longitude": "${standbymain.curLong}"
+                "latitude": "$lat",
+                "longitude": "$long"
             }
         """.trimIndent().toRequestBody()
+            val request = Request.Builder()
+                .url(url)
+                .put(jsonBody)
+                .addHeader("Content-Type", "application/json")
+                .build()
+            Thread {
+                try {
+                    client.newCall(request).enqueue(object : Callback {
+                        override fun onFailure(call: Call, e: IOException) {
+                            Log.d("FALL_API", "❌ Error: ${e.message}")
+                        }
+                        override fun onResponse(call: Call, response: Response) {
+                            Log.d("FALL_API", "✅ Sent: ${response.code} Successfully")
+                        }
+                    })
+                } catch (e: IOException) {
+                    Log.d("FALL_API", "❌ IOException: ${e.message}")
+                }
+            }.start()
+        }
 
-        val request = Request.Builder()
-            .url(url)
-            .put(jsonBody)
-            .addHeader("Content-Type", "application/json")
-            .build()
-
-        Thread {
-            try {
-                client.newCall(request).enqueue(object : Callback {
-                    override fun onFailure(call: Call, e: IOException) {
-                        Log.d("FALL_API", "❌ Error: ${e.message}")
-                    }
-                    override fun onResponse(call: Call, response: Response) {
-                        Log.d("FALL_API", "✅ Sent: ${response.code}")
-                    }
-                })
-            } catch (e: IOException) {
-                Log.d("FALL_API", "❌ IOException: ${e.message}")
-            }
-        }.start()
-    }
 
     private fun sendHeartRateToServer(preferenceData: MyPreferenceData) {
         val client = OkHttpClient()
-        val url = "https://afetest.newjtech.online/api/sentHeartRate"
+        val url = "https://afe-project-production.up.railway.app/api/sentHeartRate"
         val body = """
             {
                 "uId": "${preferenceData.getUserId()}",
@@ -582,26 +601,22 @@ class BackgroundService : Service(), ConnectionObserver {
         }
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_START_TRACKING -> {
+                Log.d("GPS_CONTROL", "🚨 ได้รับคำสั่งฉุกเฉิน: บังคับเปิด GPS!")
+                isEmergencyMode = true  // เข้าโหมดฉุกเฉิน (ห้ามปิด)
+                startLocationUpdates()  // สั่งเปิด GPS ทันที
+            }
+            ACTION_STOP_TRACKING -> {
+                Log.d("GPS_CONTROL", "ได้รับคำสั่งปิดโหมดฉุกเฉิน")
+                isEmergencyMode = false // ยกเลิกโหมดฉุกเฉิน
+                stopLocationUpdates()   // สั่งปิด GPS (กลับสู่สถานะปกติ)
 
-//        val refreshRunnable = object : Runnable {
-//            override fun run() {
-//                // เริ่ม tracker ก็ต่อเมื่อเชื่อมต่อแล้ว และยังไม่ได้เริ่ม
-//                if (isHealthConnected && isSkinTempAvailable && !isSkinTempStarted) {
-//                    tryStartSkinTemperature()
-//                }
-//
-//                // GPS วิ่งต่อเนื่องอยู่แล้ว
-//                requestOkHttpClient(preferenceData)
-//                sendTemperatureToServer(preferenceData)
-//                sendHeartRateToServer(preferenceData)
-//
-//                val temp = preferenceData.getTemperature()
-//                val status = preferenceData.getTemperatureStatus()
-//                Log.d("TEMP_PREF", "Stored Temp = $temp °C, Status = $status")
-//
-//                handler.postDelayed(this, refreshIntervalMillis)
-//            }
-//        }
+                // รีเซ็ตค่าพิกัดเป็น 0 (ถ้าต้องการ)
+                standbymain.curLat = 0.0
+                standbymain.curLong = 0.0
+            }
+        }
         if (!::preferenceData.isInitialized) {
             preferenceData = MyPreferenceData(this)
         }
@@ -646,7 +661,7 @@ class BackgroundService : Service(), ConnectionObserver {
 
     private fun sendTemperatureToServer(preferenceData: MyPreferenceData) {
         val client = OkHttpClient()
-        val url = "https://afetest.newjtech.online/api/sentTemperature"
+        val url = "https://afe-project-production.up.railway.app/api/sentTemperature"
 
         val body = """
             {
@@ -679,11 +694,11 @@ class BackgroundService : Service(), ConnectionObserver {
         }.start()
     }
 
-    private var isServerAllowTrackingGps = false // อนุญาติให้มีการตรวจสอบว่าผู้ใช้จะเแิดหรอืปิดระบบติดตามแบบ realtime
+
     // ==== CHANGED: ส่งตำแหน่งด้วย JSON + PUT ให้เหมือน sendTemperatureToServer ====
     private fun requestOkHttpClient(preferenceData: MyPreferenceData) {
         val client = OkHttpClient()
-        val url = "https://afetest.newjtech.online/api/sentlocation"
+        val url = "https://afe-project-production.up.railway.app/api/sentlocation"
 
         val jsonString = """
             {
@@ -716,6 +731,8 @@ class BackgroundService : Service(), ConnectionObserver {
                         // อ่าน body ของ response โดยแปลงเป็น string
                         val responseBodyStr = response.body?.string()
                         Log.d("LOC_API", "Response body = $responseBodyStr")
+                        Log.d("LOC_API", "EmergencyMode = ")
+
 
                         if (response.isSuccessful && responseBodyStr != null) {
                             try {
@@ -732,11 +749,47 @@ class BackgroundService : Service(), ConnectionObserver {
                                         updateTrackingState(command)
                                     }
                                 }
+
+                                if (json.has("request_location")) {
+
+                                    val startView = json.getBoolean("request_location")
+                                    Log.d("DEBUG_GPS", "startView: $startView")
+
+                                    if (startView && !isEmergencyMode){
+                                        Log.d("GPS_CONTROL", "✅ เปิดตำแหน่ง")
+                                        val intent = Intent(this@BackgroundService, BackgroundService::class.java)
+                                        intent.action = ACTION_START_TRACKING
+                                        startService(intent)
+                                    }
+                                }
+
+                                if (json.has("stop_emergency")){
+                                    val stopNow = json.getBoolean("stop_emergency")
+
+                                    if (stopNow && isEmergencyMode){
+                                        Log.d("GPS_CONTROL", "✅ ภารกิจเสร็จสิ้น! ส่ง Intent สั่งปิดตัวเอง")
+                                        val intent = Intent(this@BackgroundService, BackgroundService::class.java)
+                                        intent.action = ACTION_STOP_TRACKING
+                                        startService(intent)
+                                    }
+                                }
+
+                                if (json.has("request_extended_help_location")) {
+                                    val extendedHelp = json.getBoolean("request_extended_help_location")
+
+                                    if (extendedHelp && !isEmergencyMode){
+                                        Log.d("GPS_CONTROL", "✅ ส่ง Intent สั่งเปิด Extended Help Location")
+                                        val intent = Intent(this@BackgroundService, BackgroundService::class.java)
+                                        intent.action = ACTION_START_TRACKING
+                                        startService(intent)
+                                    }
+                                }
+
                             } catch (e: Exception) {
                                 Log.e("LOC_API", "Json Parse Error: ${e.message}")
                             }
                         }
-                        Log.d("LOC_API", "✅ Sent: ${response.code}")
+                        Log.d("LOC_API", "✅ Sent: ${isEmergencyMode}")
                         response.close()
                     }
                 })
@@ -751,6 +804,13 @@ class BackgroundService : Service(), ConnectionObserver {
     private fun updateTrackingState(enable: Boolean) {
         Handler(Looper.getMainLooper()).post {
             standbymain.isTrackingOn = enable
+
+//            if (!enable && isEmergencyMode) {
+//                Log.d("GPS_CONTROL", "Server สั่งปิด แต่ติด Emergency Mode -> เปิดต่อ!")
+//                startLocationUpdates()
+//                return@post
+//            }
+
             if (enable) {
                 Log.d("GPS_CONTROL", "Server สั่ง: ✅ เปิด GPS")
                 startLocationUpdates() // เรียกฟังก์ชันเดิมของคุณที่มีอยู่แล้ว
