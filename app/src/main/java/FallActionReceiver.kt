@@ -22,8 +22,8 @@ class FallActionReceiver : BroadcastReceiver() {
         val pref = MyPreferenceData(context)
 
         val fallStatus = when (action) {
-            ACTION_OK -> 1
-            ACTION_NOT_OK -> 2
+//            ACTION_OK -> 1
+            ACTION_NOT_OK -> 0
             else -> return
         }
         pref.setFallStatus(fallStatus)
@@ -36,7 +36,7 @@ class FallActionReceiver : BroadcastReceiver() {
 //
 //            // ส่งไปหลังบ้าน (ตามฟอร์แมตเดียวกับ HelpActivity)
 //            val client = OkHttpClient()
-//            val url = "https://afe-project-production.up.railway.app/api/sentFall"
+//            val url = "${Config.BASE_URL}api/watch/fall"
 //            val jsonBody = """
 //        {
 //            "users_id": "${pref.getUserId()}",
@@ -73,7 +73,7 @@ class FallActionReceiver : BroadcastReceiver() {
 
         // ส่งไปหลังบ้าน (ตามฟอร์แมตเดียวกับ HelpActivity)
         val client = OkHttpClient()
-        val url = "https://afe-project-production.up.railway.app/api/sentFall"
+        val url = "${Config.BASE_URL}api/watch/fall"
         val jsonBody = """
         {
             "users_id": "${pref.getUserId()}",

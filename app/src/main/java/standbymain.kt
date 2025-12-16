@@ -230,26 +230,26 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
         Log.d("Debug", "SafeZoneLat=$safeZoneLat, SafeZoneLong=$safeZoneLong, R1=$r1, R2=$r2")
         val btnSos = findViewById<Button>(R.id.btnSos)
         btnSos.setOnClickListener {
-//            val intent = Intent(this, HelpActivity::class.java)
-//            startActivity(intent)
-            Thread {
-                val statusCodeSOS = requestSOS(uId)
-                runOnUiThread {
-                    if (statusCodeSOS == 200) {
-                        Toast.makeText(
-                            this,
-                            "ขอความช่วยเหลือ ถึงผู้ดูแลรหัส ${uId} สำเร็จ",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    } else {
-                        val builder = AlertDialog.Builder(this)
-                        builder.setTitle("!!! แจ้งเตือน !!!")
-                        builder.setMessage("ขอความช่วยเหลือ ถึง ${uId} ไม่สำเร็จ")
-                        builder.setPositiveButton("OK") { _, _ -> }
-                        builder.show()
-                    }
-                }
-            }.start()
+            val intent = Intent(this, HelpActivity::class.java)
+            startActivity(intent)
+//            Thread {
+//                val statusCodeSOS = requestSOS(uId)
+//                runOnUiThread {
+//                    if (statusCodeSOS == 200) {
+//                        Toast.makeText(
+//                            this,
+//                            "ขอความช่วยเหลือ ถึงผู้ดูแลรหัส ${uId} สำเร็จ",
+//                            Toast.LENGTH_LONG
+//                        ).show()
+//                    } else {
+//                        val builder = AlertDialog.Builder(this)
+//                        builder.setTitle("!!! แจ้งเตือน !!!")
+//                        builder.setMessage("ขอความช่วยเหลือ ถึง ${uId} ไม่สำเร็จ")
+//                        builder.setPositiveButton("OK") { _, _ -> }
+//                        builder.show()
+//                    }
+//                }
+//            }.start()
             val serviceIntent = Intent(this, BackgroundService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 // สำหรับ Android 8.0 (Oreo) ขึ้นไป
@@ -318,7 +318,7 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
 
 //    private fun sendTemperatureToServer(preferenceData: MyPreferenceData) {
 //        val client = OkHttpClient()
-//        val url = "https://sepawplus-production.up.railway.app/api/sentTemperature"
+//        val url = "https://sepawplus-production.up.railway.app/api/watch/temperature"
 //
 //
 //        val body = """
@@ -525,7 +525,7 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
     public fun requestOkHttpClient(preferenceData: MyPreferenceData) {
         try {
             val client = OkHttpClient()
-            val url = "https://afe-project-production.up.railway.app/api/sentlocation"
+            val url = "${Config.BASE_URL}api/watch/location-battery"
             //val mediaType = "application/json".toMediaType()
             val body = """
     {
@@ -615,7 +615,7 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
     //Private
     fun requestSOS(uId: String): Int {
         val client = OkHttpClient()
-        val url = "https://afe-project-production.up.railway.app/api/requestSOS"
+        val url = "${Config.BASE_URL}api/requestSOS"
 //        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
 //            .addFormDataPart("uid",uId.toString())
 //            .build()

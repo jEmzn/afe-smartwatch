@@ -89,7 +89,7 @@ class HelpActivity : Activity() {
         startCountdown()
 
         buttonOk.setOnClickListener {
-            val fallstatus = 1
+            val fallstatus = -1
             preferenceData.setFallStatus(fallstatus) // 1 = โอเค
 //            BackgroundService.isEmergencyMode = false
             if (!(BackgroundService.isServerAllowTrackingGps)) {
@@ -107,7 +107,7 @@ class HelpActivity : Activity() {
         }
 
         buttonNotOk.setOnClickListener {
-            val fallstatus = 2
+            val fallstatus = 0
 //            if (!(BackgroundService.isServerAllowTrackingGps)) {
 //                val intent = Intent(this, BackgroundService::class.java).apply {
 //                    action =
@@ -135,7 +135,7 @@ class HelpActivity : Activity() {
 
             override fun onFinish() {
                 textView.text = "ไม่มีการตอบสนอง กำลังแจ้งเตือนผู้ดูแล..."
-                val fallStatus = 3
+                val fallStatus = 0
 //                if (!(BackgroundService.isServerAllowTrackingGps)) {
 //                    val intent = Intent(this@HelpActivity, BackgroundService::class.java).apply {
 //                        action =
@@ -201,7 +201,7 @@ class HelpActivity : Activity() {
             val lat = standbymain.curLat
             val long = standbymain.curLong
             val client = OkHttpClient()
-            val url = "https://afe-project-production.up.railway.app/api/sentFall"
+            val url = "${Config.BASE_URL}api/watch/fall"
             val jsonBody = """
             {
                 "users_id": "${preferenceData.getUserId()}",

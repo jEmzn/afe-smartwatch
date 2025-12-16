@@ -38,7 +38,7 @@ class login : ComponentActivity() {
     }
 
     private fun connectPhoneApp(uId: String, uPin:String){
-        val url = "https://afe-project-production.up.railway.app/api/watchconnphone?uId=$uId&uPin=$uPin"
+        val url = "${Config.BASE_URL}api/watch/login?uId=$uId&uPin=$uPin"
         val jsonObjectRequest = JsonObjectRequest(
             Request.Method.GET, url, null,
             { response ->

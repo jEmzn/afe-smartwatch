@@ -115,7 +115,10 @@ class BackgroundService : Service(), ConnectionObserver {
     private val LOG_RAW_EVERY_MS = 250L
     private var lastRawLog = 0L
 
-    private var isTrackingLocation = false
+//    private var isTrackingLocation = false
+
+    private var isLocationFresh: Boolean = false
+
 
     companion object {
         const val ACTION_START_TRACKING = "ACTION_START_TRACKING" // ชื่อคำสั่งเปิด
@@ -157,7 +160,8 @@ class BackgroundService : Service(), ConnectionObserver {
 
         // --- GPS: init + start continuous updates ---
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-//        startLocationUpdates()  // <— เริ่มที่นี่
+        isEmergencyMode = true
+        startLocationUpdates() // <— เริ่มที่นี่
 
         // Health connections
         connectionManager = ConnectionManager(this)
@@ -207,10 +211,12 @@ class BackgroundService : Service(), ConnectionObserver {
             return
         }
 
-//        if (isTrackingLocation) {
-//            Log.d("GPS", "Tracking is already running. Skipping start.")
-//            return
-//        }
+        // --- แก้ไขตรงนี้: ถ้ามี callback ทำงานอยู่แล้ว ไม่ต้องสร้างใหม่ ---
+        if (::locationCallback.isInitialized) {
+            Log.d("GPS", "♻️ พบ Callback เก่า คลีนอัพก่อนสร้างใหม่")
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+            // หรือถ้าต้องการรีสตาร์ทจริงๆ ให้เรียก stopLocationUpdates() ก่อนบรรทัดนี้
+        }
 
         val req = LocationRequest.create()
             .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
@@ -223,6 +229,8 @@ class BackgroundService : Service(), ConnectionObserver {
                 // อัปเดตตำแหน่งให้ตัวแปรกลาง
                 standbymain.curLat = loc.latitude
                 standbymain.curLong = loc.longitude
+
+                isLocationFresh = true
 
                 // คำนวณระยะ (ใช้ค่าใน preferences ของผู้ใช้)
                 val pref = MyPreferenceData(this@BackgroundService)
@@ -254,6 +262,7 @@ class BackgroundService : Service(), ConnectionObserver {
     private fun stopLocationUpdates() {
         if (::locationCallback.isInitialized) {
             fusedLocationClient.removeLocationUpdates(locationCallback)
+            isLocationFresh = false
             Log.d("GPS", "🛑 stopLocationUpdates()")
         }
     }
@@ -509,7 +518,7 @@ class BackgroundService : Service(), ConnectionObserver {
             val lat = standbymain.curLat
             val long = standbymain.curLong
             val client = OkHttpClient()
-            val url = "https://afe-project-production.up.railway.app/api/sentFall"
+            val url = "${Config.BASE_URL}api/watch/fall"
             val jsonBody = """
             {
                 "users_id": "${preferenceData.getUserId()}",
@@ -546,7 +555,7 @@ class BackgroundService : Service(), ConnectionObserver {
 
     private fun sendHeartRateToServer(preferenceData: MyPreferenceData) {
         val client = OkHttpClient()
-        val url = "https://afe-project-production.up.railway.app/api/sentHeartRate"
+        val url = "${Config.BASE_URL}api/watch/heart-rate"
         val body = """
             {
                 "uId": "${preferenceData.getUserId()}",
@@ -610,11 +619,12 @@ class BackgroundService : Service(), ConnectionObserver {
             ACTION_STOP_TRACKING -> {
                 Log.d("GPS_CONTROL", "ได้รับคำสั่งปิดโหมดฉุกเฉิน")
                 isEmergencyMode = false // ยกเลิกโหมดฉุกเฉิน
-                stopLocationUpdates()   // สั่งปิด GPS (กลับสู่สถานะปกติ)
+                isLocationFresh = false // รีเซ็ตค่า
+                stopLocationUpdates()   // สั่งปิด GPS (กลับสู่สถานะปกติ
 
                 // รีเซ็ตค่าพิกัดเป็น 0 (ถ้าต้องการ)
-                standbymain.curLat = 0.0
-                standbymain.curLong = 0.0
+//                standbymain.curLat = 0.0
+//                standbymain.curLong = 0.0
             }
         }
         if (!::preferenceData.isInitialized) {
@@ -661,7 +671,7 @@ class BackgroundService : Service(), ConnectionObserver {
 
     private fun sendTemperatureToServer(preferenceData: MyPreferenceData) {
         val client = OkHttpClient()
-        val url = "https://afe-project-production.up.railway.app/api/sentTemperature"
+        val url = "${Config.BASE_URL}api/watch/temperature"
 
         val body = """
             {
@@ -698,7 +708,7 @@ class BackgroundService : Service(), ConnectionObserver {
     // ==== CHANGED: ส่งตำแหน่งด้วย JSON + PUT ให้เหมือน sendTemperatureToServer ====
     private fun requestOkHttpClient(preferenceData: MyPreferenceData) {
         val client = OkHttpClient()
-        val url = "https://afe-project-production.up.railway.app/api/sentlocation"
+        val url = "${Config.BASE_URL}api/watch/location-battery"
 
         val jsonString = """
             {
@@ -708,7 +718,8 @@ class BackgroundService : Service(), ConnectionObserver {
                 "latitude": "${standbymain.curLat}",
                 "longitude": "${standbymain.curLong}",
                 "battery": "${standbymain.batLevel}",
-                "status": "${standbymain.status}"
+                "status": "${standbymain.status}",
+                "location_status": $isLocationFresh
             }
         """.trimIndent()
         val body = jsonString.toRequestBody("application/json".toMediaTypeOrNull())
@@ -744,9 +755,13 @@ class BackgroundService : Service(), ConnectionObserver {
                                     val command = json.getBoolean("command_tracking")
 
                                     // ถ้าค่าไม่เหมือนเดิม ให้สั่งทำงาน
-                                    if (command != isServerAllowTrackingGps) {
-                                        isServerAllowTrackingGps = command
-                                        updateTrackingState(command)
+                                    if (!command && isServerAllowTrackingGps) {
+                                        isServerAllowTrackingGps = false
+                                        updateTrackingState(false)
+                                    } else if (command && !isServerAllowTrackingGps) {
+                                        isServerAllowTrackingGps = true
+                                        isEmergencyMode = false
+                                        updateTrackingState(true)
                                     }
                                 }
 
@@ -755,7 +770,20 @@ class BackgroundService : Service(), ConnectionObserver {
                                     val startView = json.getBoolean("request_location")
                                     Log.d("DEBUG_GPS", "startView: $startView")
 
-                                    if (startView && !isEmergencyMode){
+                                    if (startView && !isEmergencyMode){     // ต้องนำ isEmergencyMode มาเช็คเพราะ ถ้าไม่เช็คแล้วเปิดโหมดติดตาม ตำสั่งนี้จะถูกใช้ตลอด
+                                        Log.d("GPS_CONTROL", "✅ เปิดตำแหน่ง")
+                                        val intent = Intent(this@BackgroundService, BackgroundService::class.java)
+                                        intent.action = ACTION_START_TRACKING
+                                        startService(intent)
+                                    }
+                                }
+
+                                if (json.has("view_location")) {
+
+                                    val viewLocation = json.getBoolean("view_location")
+                                    Log.d("DEBUG_GPS", "startView: $viewLocation")
+
+                                    if (viewLocation && !isEmergencyMode){
                                         Log.d("GPS_CONTROL", "✅ เปิดตำแหน่ง")
                                         val intent = Intent(this@BackgroundService, BackgroundService::class.java)
                                         intent.action = ACTION_START_TRACKING
@@ -774,22 +802,24 @@ class BackgroundService : Service(), ConnectionObserver {
                                     }
                                 }
 
-                                if (json.has("request_extended_help_location")) {
-                                    val extendedHelp = json.getBoolean("request_extended_help_location")
-
-                                    if (extendedHelp && !isEmergencyMode){
-                                        Log.d("GPS_CONTROL", "✅ ส่ง Intent สั่งเปิด Extended Help Location")
-                                        val intent = Intent(this@BackgroundService, BackgroundService::class.java)
-                                        intent.action = ACTION_START_TRACKING
-                                        startService(intent)
-                                    }
-                                }
+//                                if (json.has("request_extended_help_location")) {
+//                                    val extendedHelp = json.getBoolean("request_extended_help_location")
+//
+//                                    if (extendedHelp && !isEmergencyMode){
+//                                        Log.d("GPS_CONTROL", "✅ ส่ง Intent สั่งเปิด Extended Help Location")
+//                                        val intent = Intent(this@BackgroundService, BackgroundService::class.java)
+//                                        intent.action = ACTION_START_TRACKING
+//                                        startService(intent)
+//                                    }
+//                                }
 
                             } catch (e: Exception) {
                                 Log.e("LOC_API", "Json Parse Error: ${e.message}")
                             }
                         }
-                        Log.d("LOC_API", "✅ Sent: ${isEmergencyMode}")
+                        Log.d("LOC_API", "✅ Sent: ${response.code}")
+                        Log.d("GPS", "var isEmergencyMode = ${isEmergencyMode}\n" +
+                                "var isServerAllowTrackingGps = $isServerAllowTrackingGps")
                         response.close()
                     }
                 })
@@ -817,9 +847,9 @@ class BackgroundService : Service(), ConnectionObserver {
             } else {
                 Log.d("GPS_CONTROL", "Server สั่ง: 🛑 ปิด GPS")
                 stopLocationUpdates()  // เรียกฟังก์ชันเดิมของคุณที่มีอยู่แล้ว
-                standbymain.curLat = 0.0
-                standbymain.curLong = 0.0
-                standbymain.distance = 0
+//                standbymain.curLat = 0.0
+//                standbymain.curLong = 0.0
+//                standbymain.distance = 0
             }
         }
     }
