@@ -230,26 +230,26 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
         Log.d("Debug", "SafeZoneLat=$safeZoneLat, SafeZoneLong=$safeZoneLong, R1=$r1, R2=$r2")
         val btnSos = findViewById<Button>(R.id.btnSos)
         btnSos.setOnClickListener {
-            val intent = Intent(this, HelpActivity::class.java)
-            startActivity(intent)
-//            Thread {
-//                val statusCodeSOS = requestSOS(uId)
-//                runOnUiThread {
-//                    if (statusCodeSOS == 200) {
-//                        Toast.makeText(
-//                            this,
-//                            "ขอความช่วยเหลือ ถึงผู้ดูแลรหัส ${uId} สำเร็จ",
-//                            Toast.LENGTH_LONG
-//                        ).show()
-//                    } else {
-//                        val builder = AlertDialog.Builder(this)
-//                        builder.setTitle("!!! แจ้งเตือน !!!")
-//                        builder.setMessage("ขอความช่วยเหลือ ถึง ${uId} ไม่สำเร็จ")
-//                        builder.setPositiveButton("OK") { _, _ -> }
-//                        builder.show()
-//                    }
-//                }
-//            }.start()
+//            val intent = Intent(this, HelpActivity::class.java)
+//            startActivity(intent)
+            Thread {
+                val statusCodeSOS = requestSOS(uId)
+                runOnUiThread {
+                    if (statusCodeSOS == 200) {
+                        Toast.makeText(
+                            this,
+                            "ขอความช่วยเหลือ ถึงผู้ดูแลรหัส ${uId} สำเร็จ",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        val builder = AlertDialog.Builder(this)
+                        builder.setTitle("!!! แจ้งเตือน !!!")
+                        builder.setMessage("ขอความช่วยเหลือ ถึง ${uId} ไม่สำเร็จ")
+                        builder.setPositiveButton("OK") { _, _ -> }
+                        builder.show()
+                    }
+                }
+            }.start()
             val serviceIntent = Intent(this, BackgroundService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 // สำหรับ Android 8.0 (Oreo) ขึ้นไป
