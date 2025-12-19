@@ -28,44 +28,6 @@ class FallActionReceiver : BroadcastReceiver() {
         }
         pref.setFallStatus(fallStatus)
 
-//        SingleLocationHelper.getSingleLocation(context) { loc ->
-//            // ทำเครื่องหมายว่า session ปัจจุบันถูกตอบแล้ว
-//            val p = context.getSharedPreferences("fall_prefs", Context.MODE_PRIVATE)
-//            val cur = p.getLong("current_session_id", -2L)
-//            p.edit().putLong("handled_session_id", cur).apply()
-//
-//            // ส่งไปหลังบ้าน (ตามฟอร์แมตเดียวกับ HelpActivity)
-//            val client = OkHttpClient()
-//            val url = "${Config.BASE_URL}api/watch/fall"
-//            val jsonBody = """
-//        {
-//            "users_id": "${pref.getUserId()}",
-//            "takecare_id": "${pref.getTakecareId()}",
-//            "x_axis": "${pref.getXAxis()}",
-//            "y_axis": "${pref.getYAxis()}",
-//            "z_axis": "${pref.getZAxis()}",
-//            "fall_status": "$fallStatus",
-//            "latitude": "${standbymain.curLat}",
-//            "longitude": "${standbymain.curLong}"
-//        }
-//    """.trimIndent().toRequestBody()
-//
-//            val request = Request.Builder()
-//                .url(url)
-//                .put(jsonBody)
-//                .addHeader("Content-Type", "application/json")
-//                .build()
-//
-//            Thread {
-//                try {
-//                    client.newCall(request).execute().use { resp ->
-//                        Log.d("FALL_API", "Action $action sent: ${resp.code}")
-//                    }
-//                } catch (e: Exception) {
-//                    Log.d("FALL_API", "Action $action error: ${e.message}")
-//                }
-//            }.start()
-//        }
         // ทำเครื่องหมายว่า session ปัจจุบันถูกตอบแล้ว
         val p = context.getSharedPreferences("fall_prefs", Context.MODE_PRIVATE)
         val cur = p.getLong("current_session_id", -2L)

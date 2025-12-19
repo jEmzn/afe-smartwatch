@@ -78,7 +78,11 @@ class HelpActivity : Activity() {
                     BackgroundService.ACTION_START_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
             }
             startService(intent)
+            isEmergencyMode = false
+//            BackgroundService.isServerAllowTrackingGps = true
         }
+
+
 
         textView = findViewById(R.id.txtHelp)
         buttonOk = findViewById(R.id.btnOk)
@@ -135,7 +139,7 @@ class HelpActivity : Activity() {
 
             override fun onFinish() {
                 textView.text = "ไม่มีการตอบสนอง กำลังแจ้งเตือนผู้ดูแล..."
-                val fallStatus = 0
+                val fallStatus = 1
 //                if (!(BackgroundService.isServerAllowTrackingGps)) {
 //                    val intent = Intent(this@HelpActivity, BackgroundService::class.java).apply {
 //                        action =
@@ -196,6 +200,7 @@ class HelpActivity : Activity() {
     private fun sendFallToServer(preferenceData: MyPreferenceData, fallStatus: Int) {
         Log.d("FALL_API", "ส่งข้อมูลการล้มไป backend (status: $fallStatus)")
 
+
         // 👇 ขอพิกัด 1 ครั้งก่อนส่งไป server
 
             val lat = standbymain.curLat
@@ -211,7 +216,8 @@ class HelpActivity : Activity() {
                 "z_axis": "${preferenceData.getZAxis()}",
                 "fall_status": "$fallStatus",
                 "latitude": "$lat",
-                "longitude": "$long"
+                "longitude": "$long",
+                "test": "TEST"
             }
         """.trimIndent().toRequestBody()
             val request = Request.Builder()
@@ -232,25 +238,26 @@ class HelpActivity : Activity() {
                             if (response.isSuccessful && responseBodyStr != null) {
                                 Log.d("FALL_API", "✅ ส่งสำเร็จ! Response: $responseBodyStr")
 
-                                try {
-                                    // 2. แปลง String เป็น JSON Object เพื่อดึงค่า
-                                    val json = JSONObject(responseBodyStr)
-
-                                    if (json.has("stop_emergency")) {
-                                        val stopEmergency = json.getBoolean("stop_emergency")
-                                        if (stopEmergency && !(BackgroundService.isServerAllowTrackingGps)) {
-                                            val intent = Intent(this@HelpActivity, BackgroundService::class.java).apply {
-                                                action =
-                                                    BackgroundService.ACTION_STOP_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
-
-                                            }
-                                            startService(intent)
-                                        }
-                                    }
-
-                                } catch (e: JSONException) {
-                                    Log.e("FALL_API", "❌ อ่าน JSON ผิดพลาด: ${e.message}")
-                                }
+//                                try {
+//                                    // 2. แปลง String เป็น JSON Object เพื่อดึงค่า
+//                                    val json = JSONObject(responseBodyStr)
+//
+//                                    if (json.has("stop_emergency")) {
+//                                        val stopEmergency = json.getBoolean("stop_emergency")
+//                                        if (stopEmergency && !(BackgroundService.isServerAllowTrackingGps)) {
+//                                            val intent = Intent(this@HelpActivity, BackgroundService::class.java).apply {
+//                                                action =
+//                                                    BackgroundService.ACTION_STOP_TRACKING // ต้องไปเพิ่ม Action นี้ใน Service หรือเรียกเมธอดตรงๆ
+//
+//                                            }
+//                                            startService(intent)
+//                                            Log.d("GPS", "=========== ล้มสั่งปิด ==========")
+//                                        }
+//                                    }
+//
+//                                } catch (e: JSONException) {
+//                                    Log.e("FALL_API", "❌ อ่าน JSON ผิดพลาด: ${e.message}")
+//                                }
                             } else {
                                 Log.e("FALL_API", "⚠️ Server ตอบกลับ Error: ${response.code}")
                             }

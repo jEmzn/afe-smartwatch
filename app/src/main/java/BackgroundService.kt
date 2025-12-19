@@ -613,7 +613,7 @@ class BackgroundService : Service(), ConnectionObserver {
         when (intent?.action) {
             ACTION_START_TRACKING -> {
                 Log.d("GPS_CONTROL", "🚨 ได้รับคำสั่งฉุกเฉิน: บังคับเปิด GPS!")
-                isEmergencyMode = true  // เข้าโหมดฉุกเฉิน (ห้ามปิด)
+//                isEmergencyMode = true  // เข้าโหมดฉุกเฉิน (ห้ามปิด)
                 startLocationUpdates()  // สั่งเปิด GPS ทันที
             }
             ACTION_STOP_TRACKING -> {
@@ -768,12 +768,13 @@ class BackgroundService : Service(), ConnectionObserver {
                                 if (json.has("request_location")) {
 
                                     val startView = json.getBoolean("request_location")
-                                    Log.d("DEBUG_GPS", "startView: $startView")
+                                    Log.d("GPS", "startFallView: $startView")
 
                                     if (startView && !isEmergencyMode){     // ต้องนำ isEmergencyMode มาเช็คเพราะ ถ้าไม่เช็คแล้วเปิดโหมดติดตาม ตำสั่งนี้จะถูกใช้ตลอด
                                         Log.d("GPS_CONTROL", "✅ เปิดตำแหน่ง")
                                         val intent = Intent(this@BackgroundService, BackgroundService::class.java)
                                         intent.action = ACTION_START_TRACKING
+                                        isEmergencyMode = true
                                         startService(intent)
                                     }
                                 }
@@ -781,12 +782,13 @@ class BackgroundService : Service(), ConnectionObserver {
                                 if (json.has("view_location")) {
 
                                     val viewLocation = json.getBoolean("view_location")
-                                    Log.d("DEBUG_GPS", "startView: $viewLocation")
+                                    Log.d("GPS", "startView: $viewLocation")
 
                                     if (viewLocation && !isEmergencyMode){
                                         Log.d("GPS_CONTROL", "✅ เปิดตำแหน่ง")
                                         val intent = Intent(this@BackgroundService, BackgroundService::class.java)
                                         intent.action = ACTION_START_TRACKING
+                                        isEmergencyMode = true
                                         startService(intent)
                                     }
                                 }
@@ -795,7 +797,7 @@ class BackgroundService : Service(), ConnectionObserver {
                                     val stopNow = json.getBoolean("stop_emergency")
 
                                     if (stopNow && isEmergencyMode){
-                                        Log.d("GPS_CONTROL", "✅ ภารกิจเสร็จสิ้น! ส่ง Intent สั่งปิดตัวเอง")
+                                        Log.d("GPS_CONTROL", "✅ ภารกิจเสร็จสิ้น! ส่ง Intent สั่งปิดตัวเอง (stop_emergency = true)")
                                         val intent = Intent(this@BackgroundService, BackgroundService::class.java)
                                         intent.action = ACTION_STOP_TRACKING
                                         startService(intent)
