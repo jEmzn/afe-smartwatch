@@ -615,7 +615,7 @@ class standbymain : FragmentActivity(), AmbientModeSupport.AmbientCallbackProvid
     //Private
     fun requestSOS(uId: String): Int {
         val client = OkHttpClient()
-        val url = "${Config.BASE_URL}api/requestSOS"
+        val url = "${Config.BASE_URL}api/watch/sos"
 //        val body = MultipartBody.Builder().setType(MultipartBody.FORM)
 //            .addFormDataPart("uid",uId.toString())
 //            .build()
